@@ -8,7 +8,6 @@ ahocorasick_trie_node::ahocorasick_trie_node()
 
 ahocorasick_trie_node::~ahocorasick_trie_node()
 {
-
 }
 
 
@@ -35,11 +34,12 @@ bool ahocorasick_hex::add_keyword(uint8_t* data, size_t len)
 
     for (size_t i = 0; i < len; i++)
     {
-        if (!it->childs[data[i]])
+        auto k = data[i];
+        if (!it->childs[k])
         {
-            it->childs[data[i]] = std::make_shared<ahocorasick_trie_node>();
+            it->childs[k] = std::make_shared<ahocorasick_trie_node>();
         }
-        it= it->childs[data[i]];
+        it = it->childs[k];
     }
     it->exist_lens.push_back(len);
     return true;
@@ -67,16 +67,16 @@ bool ahocorasick_hex::finalize()
     // 第二层开始
     while (!bfs_queue.empty())
     {
-        auto node = bfs_queue.front();
-        bfs_queue.pop();
+        //取出一个节点
+        auto node_entry = bfs_queue.front(); bfs_queue.pop();
         for (size_t i = 0; i < 256; i++)
         {
-            // 下一个子节点
-            auto node_next = node->childs[i];
-            if (node_next)
+            // 遍历子节点
+            auto node_child = node_entry->childs[i];
+            if (node_child)
             {
                 // 父节点的fail指针
-                auto parent_node_fail = node->fail;
+                auto parent_node_fail = node_entry->fail;
                 while (parent_node_fail && !parent_node_fail->childs[i])
                 {
                     parent_node_fail = parent_node_fail->fail;
@@ -85,25 +85,24 @@ bool ahocorasick_hex::finalize()
                 if (!parent_node_fail)
                 {
                     // 回溯到了根节点
-                    node_next->fail = _trie_root;
+                    node_child->fail = _trie_root;
                 }
                 else
                 {
-                    node_next->fail = parent_node_fail->childs[i];
+                    node_child->fail = parent_node_fail->childs[i];
                 }
 
-                if (!node_next->fail->exist_lens.empty())
+                if (!node_child->fail->exist_lens.empty())
                 {
-                    for (auto exist_len : node_next->fail->exist_lens)
-                    {
-                        node->exist_lens.push_back(exist_len);
-                    }
+                    node_entry->exist_lens.insert(
+                        node_entry->exist_lens.end(),
+                        node_child->fail->exist_lens.begin(),
+                        node_child->fail->exist_lens.end());
                 }
-                bfs_queue.push(node_next);
+                bfs_queue.push(node_child);
             }
         }
     }
-
 
     return true;
 }
