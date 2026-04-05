@@ -29,7 +29,7 @@ bool ahocorasick_hex::add_keyword(uint8_t* data, size_t len)
         return false;
     }
 
-    // 构建tire树
+    // 锟斤拷锟斤拷tire锟斤拷
     std::shared_ptr<ahocorasick_trie_node> it = _trie_root;
 
     for (size_t i = 0; i < len; i++)
@@ -54,28 +54,28 @@ bool ahocorasick_hex::finalize()
 {
     std::queue<std::shared_ptr<ahocorasick_trie_node>> bfs_queue;
 
-    // 第一层fail指针 指向root
+    // 锟斤拷一锟斤拷fail指锟斤拷 指锟斤拷root
     for (size_t i = 0; i < 256; i++)
     {
         if (_trie_root->childs[i])
         {
             bfs_queue.push(_trie_root->childs[i]);
-            _trie_root->childs[i]->fail = _trie_root;
+            _trie_root->childs[i]->fail = _trie_root.get();
         }
     }
 
-    // 第二层开始
+    // 锟节讹拷锟姐开始
     while (!bfs_queue.empty())
     {
-        //取出一个节点
+        //取锟斤拷一锟斤拷锟节碉拷
         auto node_entry = bfs_queue.front(); bfs_queue.pop();
         for (size_t i = 0; i < 256; i++)
         {
-            // 遍历子节点
+            // 锟斤拷锟斤拷锟接节碉拷
             auto node_child = node_entry->childs[i];
             if (node_child)
             {
-                // 父节点的fail指针
+                // 锟斤拷锟节碉拷锟絝ail指锟斤拷
                 auto parent_node_fail = node_entry->fail;
                 while (parent_node_fail && !parent_node_fail->childs[i])
                 {
@@ -84,18 +84,18 @@ bool ahocorasick_hex::finalize()
 
                 if (!parent_node_fail)
                 {
-                    // 回溯到了根节点
-                    node_child->fail = _trie_root;
+                    // 锟斤拷锟捷碉拷锟剿革拷锟节碉拷
+                    node_child->fail = _trie_root.get();
                 }
                 else
                 {
-                    node_child->fail = parent_node_fail->childs[i];
+                    node_child->fail = parent_node_fail->childs[i].get();
                 }
 
                 if (!node_child->fail->exist_lens.empty())
                 {
-                    node_entry->exist_lens.insert(
-                        node_entry->exist_lens.end(),
+                    node_child->exist_lens.insert(
+                        node_child->exist_lens.end(),
                         node_child->fail->exist_lens.begin(),
                         node_child->fail->exist_lens.end());
                 }

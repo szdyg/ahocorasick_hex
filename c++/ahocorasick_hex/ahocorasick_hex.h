@@ -22,9 +22,9 @@ public:
     ~ahocorasick_trie_node();
 
 public:
-    std::shared_ptr<ahocorasick_trie_node> childs[256];     // ×Ó½Úµã
-    std::shared_ptr<ahocorasick_trie_node> fail;            // failÖ¸Õë
-    std::vector<size_t> exist_lens;                         // ¹Ø¼ü×Ö³¤¶È
+    std::shared_ptr<ahocorasick_trie_node> childs[256];     // ï¿½Ó½Úµï¿½
+    ahocorasick_trie_node* fail = nullptr;                   // failÖ¸ï¿½ï¿½
+    std::vector<size_t> exist_lens;                         // ï¿½Ø¼ï¿½ï¿½Ö³ï¿½ï¿½ï¿½
 };
 
 class ahocorasick_hex
