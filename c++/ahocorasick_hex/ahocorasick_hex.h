@@ -22,9 +22,9 @@ public:
     ~ahocorasick_trie_node();
 
 public:
-    std::shared_ptr<ahocorasick_trie_node> childs[256];     // �ӽڵ�
-    ahocorasick_trie_node* fail = nullptr;                   // failָ��
-    std::vector<size_t> exist_lens;                         // �ؼ��ֳ���
+    std::shared_ptr<ahocorasick_trie_node> childs[256];      // 子节点
+    ahocorasick_trie_node* fail = nullptr;                   // fail指针
+    std::vector<size_t> exist_lens;                          // 关键字长度
 };
 
 class ahocorasick_hex
