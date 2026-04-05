@@ -118,7 +118,7 @@ ahocorasick_match ahocorasick_hex::match_one(uint8_t* data, size_t len)
         {
             break;
         }
-        auto scan_node = _trie_root;
+        auto scan_node = _trie_root.get();
         for (size_t i = 0; i < len; i++)
         {
             auto k = data[i];
@@ -128,7 +128,7 @@ ahocorasick_match ahocorasick_hex::match_one(uint8_t* data, size_t len)
             }
             if (scan_node->childs[k])
             {
-                scan_node = scan_node->childs[k];
+                scan_node = scan_node->childs[k].get();
             }
             else
             {
@@ -170,7 +170,7 @@ std::vector<ahocorasick_match> ahocorasick_hex::match_all(uint8_t* data, size_t 
         {
             break;
         }
-        auto scan_node = _trie_root;
+        auto scan_node = _trie_root.get();
         for (size_t i = 0; i < len; i++)
         {
             auto k = data[i];
@@ -180,7 +180,7 @@ std::vector<ahocorasick_match> ahocorasick_hex::match_all(uint8_t* data, size_t 
             }
             if (scan_node->childs[k])
             {
-                scan_node = scan_node->childs[k];
+                scan_node = scan_node->childs[k].get();
             }
             else
             {
