@@ -55,12 +55,59 @@ public:
     ahocorasick_hex();
     ~ahocorasick_hex();
 
+    /// <summary>
+    /// 添加关键字，必须在 finalize() 之前调用；finalize() 之后再调用行为未定义。
+    /// </summary>
+    /// <param name="data">关键字数据指针</param>
+    /// <param name="len">关键字长度</param>
+    /// <returns>成功返回 true，data 为空或 len 为 0 返回 false</returns>
     bool add_keyword(uint8_t* data, size_t len);
+
+    /// <summary>
+    /// 添加关键字，必须在 finalize() 之前调用；finalize() 之后再调用行为未定义。
+    /// </summary>
+    /// <param name="str">关键字字符串</param>
+    /// <param name="len">关键字长度</param>
+    /// <returns>成功返回 true，str 为空或 len 为 0 返回 false</returns>
     bool add_keyword(const char* str, size_t len);
+
+    /// <summary>
+    /// 匹配第一个命中的关键字，调用前必须已 finalize()。
+    /// </summary>
+    /// <param name="data">待匹配数据指针</param>
+    /// <param name="len">待匹配数据长度</param>
+    /// <returns>命中结果，未命中时 keyword 为空、offset 为 0</returns>
     ahocorasick_match match_one(uint8_t* data, size_t len);
+
+    /// <summary>
+    /// 匹配第一个命中的关键字，调用前必须已 finalize()。
+    /// </summary>
+    /// <param name="str">待匹配字符串</param>
+    /// <param name="len">待匹配字符串长度</param>
+    /// <returns>命中结果，未命中时 keyword 为空、offset 为 0</returns>
     ahocorasick_match match_one(const char* str, size_t len);
+
+    /// <summary>
+    /// 匹配全部命中的关键字，调用前必须已 finalize()。
+    /// </summary>
+    /// <param name="data">待匹配数据指针</param>
+    /// <param name="len">待匹配数据长度</param>
+    /// <returns>命中结果列表，未命中时为空</returns>
     std::vector<ahocorasick_match> match_all(uint8_t* data, size_t len);
+
+    /// <summary>
+    /// 匹配全部命中的关键字，调用前必须已 finalize()。
+    /// </summary>
+    /// <param name="str">待匹配字符串</param>
+    /// <param name="len">待匹配字符串长度</param>
+    /// <returns>命中结果列表，未命中时为空</returns>
     std::vector<ahocorasick_match> match_all(const char* str, size_t len);
+
+    /// <summary>
+    /// 构建 fail 指针。必须在所有 add_keyword() 之后、任何 match_*() 之前调用，且只能调用一次；
+    /// 重复调用会导致匹配结果重复，调用后再 add_keyword() 不会为新关键字构建 fail 链。
+    /// </summary>
+    /// <returns>始终返回 true</returns>
     bool finalize();
 
 private:
