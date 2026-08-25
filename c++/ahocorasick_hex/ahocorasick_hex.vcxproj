@@ -142,10 +142,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ahocorasick_hex.cpp" />
+    <ClCompile Include="ahocorasick_hex_fuzzy.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ahocorasick_hex.h" />
+    <ClInclude Include="ahocorasick_hex_fuzzy.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -21,9 +21,15 @@
     <ClCompile Include="ahocorasick_hex.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="ahocorasick_hex_fuzzy.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ahocorasick_hex.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ahocorasick_hex_fuzzy.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

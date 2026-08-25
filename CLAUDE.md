@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 基于 AC 自动机（Aho-Corasick）的 **字节级** 多模式匹配库，用于特征码搜索。字母表是完整的 0–255 字节空间，而不是文本字符集——所以叫 "hex"。
 
-整个实现只有三个源文件，全在 `c++/ahocorasick_hex/`：
-- `ahocorasick_hex.h` / `.cpp` — 库本身
+全部源文件在 `c++/ahocorasick_hex/`：
+- `ahocorasick_hex.h` / `.cpp` — 纯字面量 AC 引擎
+- `ahocorasick_hex_fuzzy.h` / `.cpp` — 通配模式层（`"AECC3256????CEFF1256"`，`??` = 任意字节），构建在引擎之上
 - `main.cpp` — 手写的冒烟测试（`main()`，打印匹配结果），仓库里没有单元测试框架
 
 源码注释和提交信息用中文，文件为 UTF-8 编码（见提交 `028d387 utf8`）。新增代码请保持一致。
@@ -47,6 +48,15 @@ cl /nologo /EHsc /utf-8 /std:c++17 ahocorasick_hex.cpp main.cpp
 **根节点的 `fail` 是 `nullptr`，充当哨兵**。`finalize()` 和匹配循环中的 `while (... && scan_node->fail)` / `while (parent_node_fail && ...)` 都依赖这一点来终止。不要给根节点设 fail 自环。
 
 **`match_one` 与 `match_all` 是两份并行实现**（`.cpp` 中结构几乎相同的两个循环）。修 bug 或改匹配语义时必须同步改两处。`match_one` 的内层 `for` 循环体无条件 `return`，实际只取 `exist_lens` 的第一项。
+
+**通配层对引擎零侵入。** `ahocorasick_hex_fuzzy` 不改 AC 引擎的任何一行，做法是「字面量锚点 + 掩码校验」：模式按 `??` 切成字面量片段，**最长**的一段作为锚点喂给内部的 `ahocorasick_hex`，锚点命中后反推模式起点 `start = hit.offset - anchor_offset`，再对整个模式做 value/mask 逐字节比对。通配符永不进入 trie——把 `??` 展开成 256 个分支会导致 `256^k` 路径爆炸，这是该设计存在的全部理由。
+
+这一层依赖引擎两个既有特性，改引擎时注意别破坏：
+- `match_all` 返回**命中的实际字节**，通配层靠这串字节在 `_anchors` 哈希表里反查是哪个模式的锚点。若改成只返回长度或 ID，通配层必须同步改。
+- 多个模式可共用同一锚点，所以 `_anchors` 的值是 `vector<anchor_ref>`；**同一锚点只会 `add_keyword()` 一次**，这是刻意规避引擎「重复关键字导致重复命中」的缺陷。
+- 通配层自己的 `finalize()` 是幂等的（`_finalized` 标志），刻意规避引擎「重复 finalize 导致重复命中」的缺陷。引擎侧那两个缺陷仍未修。
+
+`match_one()` 无法提前收敛（锚点命中 ≠ 模式命中），内部就是完整 `match_all()` 再取首个，开销相同，不要误以为它更快。
 
 **`~ahocorasick_trie_node()` 的迭代销毁是必需的，不要"简化"回空实现。** 默认的 `shared_ptr` 链式析构会按 trie 深度递归，深度超过约 2000–3000（单个关键字 ~2–3KB）时销毁阶段直接栈溢出崩溃。现在的实现把子节点先搬到显式工作栈再逐个释放，递归深度恒为 1，已验证深度 20 万正常。其中 `use_count() == 1` 的判断用于避免在节点被多处持有时破坏树结构。
 

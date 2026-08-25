@@ -1,0 +1,17 @@
+# Visual Studio
+.vs/
+
+# 构建输出
+x64/
+Win32/
+[Dd]ebug/
+[Rr]elease/
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.iobj
+*.ipdb
+*.tlog
+*.log
