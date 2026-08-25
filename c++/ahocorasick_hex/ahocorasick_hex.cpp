@@ -27,11 +27,39 @@
 //
 #include "ahocorasick_hex.h"
 #include <queue>
+#include <cstring>
 
 ahocorasick_trie_node::ahocorasick_trie_node() {
 }
 
 ahocorasick_trie_node::~ahocorasick_trie_node() {
+    // 迭代销毁子树。
+    // 默认的 shared_ptr 链式析构会按 trie 深度递归，关键字较长时（深度约 2000 以上）
+    // 会栈溢出崩溃。这里先把子节点全部搬到显式工作栈上，再逐个释放：
+    // 每个节点真正析构时 childs 已被清空，递归深度恒为 1。
+    std::vector<std::shared_ptr<ahocorasick_trie_node>> pending;
+
+    for (auto& child : childs) {
+        if (child) {
+            pending.push_back(std::move(child));
+        }
+    }
+
+    while (!pending.empty()) {
+        auto node = std::move(pending.back());
+        pending.pop_back();
+
+        // 仅在本处持有唯一引用（即该节点马上要被销毁）时才搬走它的子节点，
+        // 否则会破坏其他持有者看到的树结构。
+        if (node.use_count() == 1) {
+            for (auto& child : node->childs) {
+                if (child) {
+                    pending.push_back(std::move(child));
+                }
+            }
+        }
+        // node 在此处析构，其 childs 已为空，不会再向下递归。
+    }
 }
 
 
