@@ -50,7 +50,7 @@
 
 class fuzzy_match {
 public:
-    size_t pattern_id = 0;      // add_pattern() 返回的模式编号
+    size_t pattern_id = 0;      // add_pattern() 时由调用者指定的模式编号
     size_t offset = 0;          // 模式在待匹配数据中的起始偏移
     std::vector<uint8_t> data;  // 命中处的实际字节（通配位为数据中的真实内容）
 };
@@ -63,19 +63,11 @@ public:
     /// <summary>
     /// 添加通配模式，必须在 finalize() 之前调用。
     /// </summary>
-    /// <param name="hex_pattern">模式串，以 '\0' 结尾，如 "AECC3256????CEFF1256"</param>
-    /// <param name="pattern_id">可选，返回该模式的编号，与 fuzzy_match::pattern_id 对应</param>
-    /// <returns>成功返回 true；模式串非法、含半字节通配、全为通配符或已 finalize() 时返回 false</returns>
-    bool add_pattern(const char* hex_pattern, size_t* pattern_id = nullptr);
-
-    /// <summary>
-    /// 添加通配模式，必须在 finalize() 之前调用。
-    /// </summary>
-    /// <param name="hex_pattern">模式串</param>
-    /// <param name="hex_len">模式串长度</param>
-    /// <param name="pattern_id">可选，返回该模式的编号</param>
-    /// <returns>成功返回 true；模式串非法、含半字节通配、全为通配符或已 finalize() 时返回 false</returns>
-    bool add_pattern(const char* hex_pattern, size_t hex_len, size_t* pattern_id = nullptr);
+    /// <param name="hex_pattern">模式串，如 "AECC3256????CEFF1256"</param>
+    /// <param name="pattern_id">由调用者指定的模式编号，命中时原样回填到 fuzzy_match::pattern_id。
+    /// 本类不校验唯一性，多个模式可以共用同一个编号</param>
+    /// <returns>成功返回 true；模式串为空、非法、含半字节通配、全为通配符或已 finalize() 时返回 false</returns>
+    bool add_pattern(const std::string& hex_pattern, size_t pattern_id);
 
     /// <summary>
     /// 构建内部自动机。必须在所有 add_pattern() 之后、任何 match_*() 之前调用。
@@ -111,6 +103,7 @@ public:
 private:
     class pattern {
     public:
+        size_t pattern_id = 0;       // 调用者指定的编号
         std::vector<uint8_t> value;  // 通配位置为 0x00
         std::vector<uint8_t> mask;   // 字面量位置为 0xFF，通配位置为 0x00
         size_t anchor_offset = 0;    // 锚点片段在模式中的偏移
@@ -119,20 +112,31 @@ private:
 
     class anchor_ref {
     public:
-        size_t pattern_id = 0;
+        size_t pattern_index = 0;  // _patterns 的下标，不是调用者指定的 pattern_id
         size_t anchor_offset = 0;
     };
 
-    // 解析十六进制模式串为 value/mask 对
-    static bool parse(const char* hex, size_t hex_len,
-                      std::vector<uint8_t>& value, std::vector<uint8_t>& mask);
+    /// <summary>
+    /// 解析十六进制模式串为 value/mask 对。
+    /// </summary>
+    /// <param name="hex">模式串，如 "AECC3256????CEFF1256"，空格/制表/换行会被忽略</param>
+    /// <param name="value">输出，字面量位置为对应字节值，通配位置为 0x00</param>
+    /// <param name="mask">输出，字面量位置为 0xFF，通配位置为 0x00</param>
+    /// <returns>成功返回 true；含非法字符、半字节通配、半字节个数为奇数或解析结果为空时返回 false</returns>
+    static bool parse(const std::string& hex, std::vector<uint8_t>& value, std::vector<uint8_t>& mask);
 
-    // 对 data[start .. start + value.size()) 做掩码比对
+    /// <summary>
+    /// 对 data[start .. start + pat.value.size()) 做逐字节掩码比对。
+    /// </summary>
+    /// <param name="pat">待校验的模式</param>
+    /// <param name="data">待匹配数据指针</param>
+    /// <param name="len">待匹配数据长度</param>
+    /// <param name="start">模式在待匹配数据中的起始偏移</param>
+    /// <returns>完全匹配返回 true；越界或任一字节不符返回 false</returns>
     bool verify(const pattern& pat, uint8_t* data, size_t len, size_t start) const;
 
     ahocorasick_hex _ac;                 // 只装字面量锚点，不含任何通配信息
-    std::vector<pattern> _patterns;
-    // 锚点字节串 -> 引用它的模式列表。多个模式可以共用同一锚点。
+    std::vector<pattern> _patterns;      // 锚点字节串 -> 引用它的模式列表。多个模式可以共用同一锚点。
     std::unordered_map<std::string, std::vector<anchor_ref>> _anchors;
     bool _finalized = false;
 };

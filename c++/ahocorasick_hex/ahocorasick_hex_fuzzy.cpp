@@ -38,7 +38,7 @@ ahocorasick_hex_fuzzy::~ahocorasick_hex_fuzzy() {
 }
 
 
-bool ahocorasick_hex_fuzzy::parse(const char* hex, size_t hex_len,
+bool ahocorasick_hex_fuzzy::parse(const std::string& hex,
                                   std::vector<uint8_t>& value,
                                   std::vector<uint8_t>& mask) {
     value.clear();
@@ -49,7 +49,7 @@ bool ahocorasick_hex_fuzzy::parse(const char* hex, size_t hex_len,
 
     int high = NIBBLE_NONE;
 
-    for (size_t i = 0; i < hex_len; i++) {
+    for (size_t i = 0; i < hex.size(); i++) {
         char c = hex[i];
 
         // 允许 "AE CC 32 56 ?? ??" 这种带分隔的写法
@@ -104,22 +104,16 @@ bool ahocorasick_hex_fuzzy::parse(const char* hex, size_t hex_len,
 }
 
 
-bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t* pattern_id) {
-    if (hex_pattern == nullptr) {
-        return false;
-    }
-    return add_pattern(hex_pattern, strlen(hex_pattern), pattern_id);
-}
-
-bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len, size_t* pattern_id) {
-    if (hex_pattern == nullptr || hex_len == 0 || _finalized) {
+bool ahocorasick_hex_fuzzy::add_pattern(const std::string& hex_pattern, size_t pattern_id) {
+    if (hex_pattern.empty() || _finalized) {
         return false;
     }
 
     pattern pat;
-    if (!parse(hex_pattern, hex_len, pat.value, pat.mask)) {
+    if (!parse(hex_pattern, pat.value, pat.mask)) {
         return false;
     }
+    pat.pattern_id = pattern_id;
 
     // 选取最长的字面量片段作为锚点；长度相同时取靠前的那个。
     // 锚点越长，AC 的误触发越少，需要做掩码校验的候选就越少。
@@ -151,7 +145,7 @@ bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len,
     pat.anchor_offset = best_offset;
     pat.anchor_len = best_len;
 
-    size_t id = _patterns.size();
+    size_t index = _patterns.size();
     std::string key((const char*)&pat.value[best_offset], best_len);
 
     auto it = _anchors.find(key);
@@ -161,17 +155,13 @@ bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len,
         if (!_ac.add_keyword(&pat.value[best_offset], best_len)) {
             return false;
         }
-        _anchors[key].push_back({ id, best_offset });
+        _anchors[key].push_back({ index, best_offset });
     }
     else {
-        it->second.push_back({ id, best_offset });
+        it->second.push_back({ index, best_offset });
     }
 
     _patterns.push_back(std::move(pat));
-
-    if (pattern_id != nullptr) {
-        *pattern_id = id;
-    }
     return true;
 }
 
@@ -222,13 +212,13 @@ std::vector<fuzzy_match> ahocorasick_hex_fuzzy::match_all(uint8_t* data, size_t 
             }
 
             size_t start = hit.offset - ref.anchor_offset;
-            const pattern& pat = _patterns[ref.pattern_id];
+            const pattern& pat = _patterns[ref.pattern_index];
             if (!verify(pat, data, len, start)) {
                 continue;
             }
 
             fuzzy_match match;
-            match.pattern_id = ref.pattern_id;
+            match.pattern_id = pat.pattern_id;
             match.offset = start;
             match.data.assign(data + start, data + start + pat.value.size());
             results.push_back(std::move(match));
