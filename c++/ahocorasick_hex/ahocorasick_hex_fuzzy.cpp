@@ -37,7 +37,7 @@ ahocorasick_hex_fuzzy::~ahocorasick_hex_fuzzy() {
 }
 
 
-bool ahocorasick_hex_fuzzy::parse(const std::string& hex,
+bool ahocorasick_hex_fuzzy::parse(const char* hex, size_t hex_len,
                                   std::vector<uint8_t>& value,
                                   std::vector<uint8_t>& mask) {
     value.clear();
@@ -48,7 +48,7 @@ bool ahocorasick_hex_fuzzy::parse(const std::string& hex,
 
     int high = NIBBLE_NONE;
 
-    for (size_t i = 0; i < hex.size(); i++) {
+    for (size_t i = 0; i < hex_len; i++) {
         char c = hex[i];
 
         // 允许 "AE CC 32 56 ?? ??" 这种带分隔的写法
@@ -117,7 +117,7 @@ bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len,
     }
 
     pattern pat;
-    if (!parse(hex_pattern, pat.value, pat.mask)) {
+    if (!parse(hex_pattern, hex_len, pat.value, pat.mask)) {
         return false;
     }
 

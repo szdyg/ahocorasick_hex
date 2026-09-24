@@ -128,11 +128,12 @@ private:
     /// <summary>
     /// 解析十六进制模式串为 value/mask 对。
     /// </summary>
-    /// <param name="hex">模式串，如 "AECC3256????CEFF1256"，空格/制表/换行会被忽略</param>
+    /// <param name="hex">模式串，如 "AECC3256????CEFF1256"，空格/制表/换行会被忽略；不要求以 '\0' 结尾</param>
+    /// <param name="hex_len">模式串长度</param>
     /// <param name="value">输出，字面量位置为对应字节值，通配位置为 0x00</param>
     /// <param name="mask">输出，字面量位置为 0xFF，通配位置为 0x00</param>
     /// <returns>成功返回 true；含非法字符、半字节通配、半字节个数为奇数或解析结果为空时返回 false</returns>
-    static bool parse(const std::string& hex, std::vector<uint8_t>& value, std::vector<uint8_t>& mask);
+    static bool parse(const char* hex, size_t hex_len, std::vector<uint8_t>& value, std::vector<uint8_t>& mask);
 
     /// <summary>
     /// 对 data[start .. start + pat.value.size()) 做逐字节掩码比对。
