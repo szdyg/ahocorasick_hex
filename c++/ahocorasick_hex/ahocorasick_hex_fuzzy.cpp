@@ -120,7 +120,6 @@ bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len,
     if (!parse(hex_pattern, pat.value, pat.mask)) {
         return false;
     }
-    pat.pattern_id = pattern_id;
 
     // 选取最长的字面量片段作为锚点；长度相同时取靠前的那个。
     // 锚点越长，AC 的误触发越少，需要做掩码校验的候选就越少。
@@ -158,15 +157,17 @@ bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len,
 
     auto it = _anchors.find(key);
     if (it == _anchors.end()) {
-        // 只有首次出现的锚点才喂给 AC。
-        // ahocorasick_hex 对同一关键字重复 add_keyword() 会重复回报命中，这里靠去重规避。
-        if (!_ac.add_keyword(&pat.value[best_offset], best_len)) {
+        // 只有首次出现的锚点才喂给 AC，以锚点编号作为 pattern_id。
+        // 同一锚点重复添加会重复回报命中，这里靠去重规避。
+        size_t anchor_id = _anchor_refs.size();
+        if (!_ac.add_keyword(&pat.value[best_offset], best_len, anchor_id)) {
             return false;
         }
-        _anchors[key].push_back({ index, best_offset });
+        _anchors[key] = anchor_id;
+        _anchor_refs.push_back({ { index, best_offset } });
     }
     else {
-        it->second.push_back({ index, best_offset });
+        _anchor_refs[it->second].push_back({ index, best_offset });
     }
 
     _patterns.push_back(std::move(pat));
@@ -209,13 +210,7 @@ std::vector<fuzzy_match> ahocorasick_hex_fuzzy::match_all(uint8_t* data, size_t 
     auto hits = _ac.match_all(data, len);
 
     for (auto& hit : hits) {
-        std::string key((const char*)hit.keyword.data(), hit.keyword.size());
-        auto it = _anchors.find(key);
-        if (it == _anchors.end()) {
-            continue;
-        }
-
-        for (auto& ref : it->second) {
+        for (auto& ref : _anchor_refs[hit.pattern_id]) {
             if (hit.offset < ref.anchor_offset) {
                 continue;  // 模式起点会落到缓冲区之前
             }

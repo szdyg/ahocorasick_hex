@@ -145,8 +145,11 @@ private:
     bool verify(const pattern& pat, uint8_t* data, size_t len, size_t start) const;
 
     ahocorasick_hex _ac;                 // 只装字面量锚点，不含任何通配信息
-    std::vector<pattern> _patterns;      // 锚点字节串 -> 引用它的模式列表。多个模式可以共用同一锚点。
-    std::unordered_map<std::string, std::vector<anchor_ref>> _anchors;
+    std::vector<pattern> _patterns;
+    // 锚点字节串 -> 锚点编号（即喂给 _ac 的 pattern_id），仅在 add_pattern() 时用于锚点去重。
+    std::unordered_map<std::string, size_t> _anchors;
+    // 锚点编号 -> 引用它的模式列表。多个模式可以共用同一锚点。
+    std::vector<std::vector<anchor_ref>> _anchor_refs;
     std::unordered_set<size_t> _ids;     // 已占用的模式编号，用于拒绝重复
     bool _finalized = false;
 };

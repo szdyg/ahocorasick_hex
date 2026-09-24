@@ -37,24 +37,26 @@ cl /nologo /EHsc /utf-8 /std:c++17 ahocorasick_hex.cpp main.cpp
 ## 架构要点
 
 **使用契约（顺序敏感，头文件里有 XML 注释说明）：**
-所有 `add_keyword()` → 恰好一次 `finalize()` → 任意多次 `match_*()`。违反顺序不会报错，只会静默给出错误结果：`finalize()` 之后添加的关键字没有 fail 链；重复 `finalize()` 会让 `exist_lens` 重复累加，导致同一命中被报告多次。改动这三个阶段中任意一个时，都要检查是否破坏了这个契约。
+所有 `add_keyword()` → 恰好一次 `finalize()` → 任意多次 `match_*()`。违反顺序不会报错，只会静默给出错误结果：`finalize()` 之后添加的关键字没有 fail 链；重复 `finalize()` 会让 `exist_keywords` 重复累加，导致同一命中被报告多次。改动这三个阶段中任意一个时，都要检查是否破坏了这个契约。
 
 **Trie 节点是定长 256 路数组**（`ahocorasick_trie_node::childs[256]`，`shared_ptr`）。换来 O(1) 的字节分派，代价是 `sizeof(ahocorasick_trie_node) == 4128` 字节（x64 实测；`shared_ptr` 16 字节 × 256）。因此 `finalize()` 里的 BFS 和 `match_*()` 都直接按字节下标索引，没有任何 map 查找，但节点数一多内存增长很快（2 万节点 ≈ 82MB）。
 
-**关键字长度而非关键字本身存在 trie 里**（`exist_lens`）。命中时用 `pos = i - exist_len + 1` 从**输入缓冲区**回读原始字节重建关键字。含义：匹配结果依赖 `data` 在调用期间有效，并且节点不持有关键字副本。
+**关键字长度与编号而非关键字本身存在 trie 里**（`exist_keywords`，元素为 `{len, pattern_id}`）。命中时用 `pos = i - exist.len + 1` 从**输入缓冲区**回读原始字节重建关键字。含义：匹配结果依赖 `data` 在调用期间有效，并且节点不持有关键字副本。
 
-**后缀输出在 finalize 期合并，不在匹配期遍历。** `finalize()` 建 fail 指针时，会把 `node->fail->exist_lens` 直接追加进 `node->exist_lens`（BFS 顺序保证 fail 节点已处理完，所以是传递闭包）。这就是为什么 `match_*()` 的热循环里不需要沿 fail 链走一遍收集输出——但也正是重复调用 `finalize()` 会造成结果重复的原因。
+**后缀输出在 finalize 期合并，不在匹配期遍历。** `finalize()` 建 fail 指针时，会把 `node->fail->exist_keywords` 直接追加进 `node->exist_keywords`（BFS 顺序保证 fail 节点已处理完，所以是传递闭包）。这就是为什么 `match_*()` 的热循环里不需要沿 fail 链走一遍收集输出——但也正是重复调用 `finalize()` 会造成结果重复的原因。
 
 **根节点的 `fail` 是 `nullptr`，充当哨兵**。`finalize()` 和匹配循环中的 `while (... && scan_node->fail)` / `while (parent_node_fail && ...)` 都依赖这一点来终止。不要给根节点设 fail 自环。
 
-**`match_one` 与 `match_all` 是两份并行实现**（`.cpp` 中结构几乎相同的两个循环）。修 bug 或改匹配语义时必须同步改两处。`match_one` 的内层 `for` 循环体无条件 `return`，实际只取 `exist_lens` 的第一项。
+**`match_one` 与 `match_all` 是两份并行实现**（`.cpp` 中结构几乎相同的两个循环）。修 bug 或改匹配语义时必须同步改两处。`match_one` 的内层 `for` 循环体无条件 `return`，实际只取 `exist_keywords` 的第一项。
 
 **通配层对引擎零侵入。** `ahocorasick_hex_fuzzy` 不改 AC 引擎的任何一行，做法是「字面量锚点 + 掩码校验」：模式按 `??` 切成字面量片段，**最长**的一段作为锚点喂给内部的 `ahocorasick_hex`，锚点命中后反推模式起点 `start = hit.offset - anchor_offset`，再对整个模式做 value/mask 逐字节比对。通配符永不进入 trie——把 `??` 展开成 256 个分支会导致 `256^k` 路径爆炸，这是该设计存在的全部理由。
 
-这一层依赖引擎两个既有特性，改引擎时注意别破坏：
-- `match_all` 返回**命中的实际字节**，通配层靠这串字节在 `_anchors` 哈希表里反查是哪个模式的锚点。若改成只返回长度或 ID，通配层必须同步改。
-- 多个模式可共用同一锚点，所以 `_anchors` 的值是 `vector<anchor_ref>`；**同一锚点只会 `add_keyword()` 一次**，这是刻意规避引擎「重复关键字导致重复命中」的缺陷。
-- 通配层自己的 `finalize()` 是幂等的（`_finalized` 标志），刻意规避引擎「重复 finalize 导致重复命中」的缺陷。引擎侧那两个缺陷仍未修。
+这一层与引擎的约定，改引擎时注意别破坏：
+- 锚点喂给引擎时以**锚点编号**作为 `pattern_id`，命中后直接用 `hit.pattern_id` 下标访问 `_anchor_refs` 取出引用该锚点的模式列表，不再按命中字节查表。`_anchors`（字节串 → 锚点编号）只在 `add_pattern()` 时用于去重。因此引擎必须把 `pattern_id` 原样回填到 `ahocorasick_match`。
+- 多个模式可共用同一锚点，所以 `_anchor_refs` 的元素是 `vector<anchor_ref>`；**同一锚点只会 `add_keyword()` 一次**，否则会对同一位置回报两次锚点命中、产生重复结果。
+- 通配层自己的 `finalize()` 是幂等的（`_finalized` 标志），刻意规避引擎「重复 finalize 导致重复命中」的缺陷。引擎侧该缺陷仍未修。
+
+**`pattern_id` 由调用者指定且不可重复**：引擎 `add_keyword()` 与通配层 `add_pattern()` 都要求传入编号，已占用的编号（`_ids`）会让添加返回 `false`。同一关键字字节串可以用不同编号添加多次，命中时按编号各报一次——这是有意为之，不是缺陷。
 
 `match_one()` 无法提前收敛（锚点命中 ≠ 模式命中），内部就是完整 `match_all()` 再取首个，开销相同，不要误以为它更快。
 
@@ -62,7 +64,6 @@ cl /nologo /EHsc /utf-8 /std:c++17 ahocorasick_hex.cpp main.cpp
 
 **已知缺陷（均已实测复现，尚未修复）：**
 - **重复 `finalize()` 会多报命中**：关键字 `{"ab","b"}` 匹配 `"xabx"`，调用两次 `finalize()` 得到 3 个命中而非 2 个。
-- **同一关键字添加两次**会在 `exist_lens` 里存两份长度，命中被报告两次。
 - `uint8_t*` 重载不带 `const`。
 
 核心匹配算法本身经 1.2 万组随机用例与暴力匹配对拍（含 0–255 全字节、重叠/嵌套/后缀关键字），结果完全一致——上面这些都是工程缺陷，不是算法错误。
