@@ -71,9 +71,13 @@ ahocorasick_hex::~ahocorasick_hex() {
 }
 
 
-bool ahocorasick_hex::add_keyword(uint8_t* data, size_t len) {
+bool ahocorasick_hex::add_keyword(uint8_t* data, size_t len, size_t pattern_id) {
     if (data == nullptr || len == 0) {
         return false;
+    }
+
+    if (_ids.count(pattern_id)) {
+        return false;  // 编号重复
     }
 
     std::shared_ptr<ahocorasick_trie_node> it = _trie_root;
@@ -85,12 +89,13 @@ bool ahocorasick_hex::add_keyword(uint8_t* data, size_t len) {
         }
         it = it->childs[k];
     }
-    it->exist_lens.push_back(len);
+    it->exist_keywords.push_back({ len, pattern_id });
+    _ids.insert(pattern_id);
     return true;
 }
 
-bool ahocorasick_hex::add_keyword(const char* str, size_t len) {
-    return add_keyword((uint8_t*)str, len);
+bool ahocorasick_hex::add_keyword(const char* str, size_t len, size_t pattern_id) {
+    return add_keyword((uint8_t*)str, len, pattern_id);
 }
 
 bool ahocorasick_hex::finalize() {
@@ -121,11 +126,11 @@ bool ahocorasick_hex::finalize() {
                     node_child->fail = parent_node_fail->childs[i].get();
                 }
 
-                if (!node_child->fail->exist_lens.empty()) {
-                    node_child->exist_lens.insert(
-                        node_child->exist_lens.end(),
-                        node_child->fail->exist_lens.begin(),
-                        node_child->fail->exist_lens.end());
+                if (!node_child->fail->exist_keywords.empty()) {
+                    node_child->exist_keywords.insert(
+                        node_child->exist_keywords.end(),
+                        node_child->fail->exist_keywords.begin(),
+                        node_child->fail->exist_keywords.end());
                 }
                 bfs_queue.push(node_child);
             }
@@ -156,12 +161,13 @@ ahocorasick_match ahocorasick_hex::match_one(uint8_t* data, size_t len) {
                 continue;
             }
 
-            if (scan_node->exist_lens.size()) {
-                for (auto exist_len : scan_node->exist_lens) {
-                    size_t pos = i - exist_len + 1;
+            if (scan_node->exist_keywords.size()) {
+                for (auto& exist : scan_node->exist_keywords) {
+                    size_t pos = i - exist.len + 1;
                     match.offset = pos;
-                    match.keyword.resize(exist_len);
-                    memcpy(match.keyword.data(), &data[pos], exist_len);
+                    match.pattern_id = exist.pattern_id;
+                    match.keyword.resize(exist.len);
+                    memcpy(match.keyword.data(), &data[pos], exist.len);
                     return match;
                 }
             }
@@ -196,13 +202,14 @@ std::vector<ahocorasick_match> ahocorasick_hex::match_all(uint8_t* data, size_t 
                 continue;
             }
 
-            if (scan_node->exist_lens.size()) {
-                for (auto exist_len : scan_node->exist_lens) {
+            if (scan_node->exist_keywords.size()) {
+                for (auto& exist : scan_node->exist_keywords) {
                     ahocorasick_match match;
-                    size_t pos = i - exist_len + 1;
+                    size_t pos = i - exist.len + 1;
                     match.offset = pos;
-                    match.keyword.resize(exist_len);
-                    memcpy(match.keyword.data(), &data[pos], exist_len);
+                    match.pattern_id = exist.pattern_id;
+                    match.keyword.resize(exist.len);
+                    memcpy(match.keyword.data(), &data[pos], exist.len);
                     matchs.push_back(std::move(match));
                 }
             }

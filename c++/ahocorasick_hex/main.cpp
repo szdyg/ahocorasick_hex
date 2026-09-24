@@ -25,9 +25,9 @@ int main()
     string s3 = "gcc";
     string s4 = "saiodcnasiabcmdsdjigccmd";
     ahocorasick_hex ac;
-    ac.add_keyword(s1.c_str(), s1.length());
-    ac.add_keyword(s2.c_str(), s2.length());
-    ac.add_keyword(s3.c_str(), s3.length());
+    ac.add_keyword(s1.c_str(), s1.length(), 1);
+    ac.add_keyword(s2.c_str(), s2.length(), 2);
+    ac.add_keyword(s3.c_str(), s3.length(), 3);
     ac.finalize();
 
     auto matchs = ac.match_all(s4.c_str(), s4.length());
@@ -36,13 +36,13 @@ int main()
     {
         macth.keyword.push_back('\0');
         string key = (char*)macth.keyword.data();
-        cout << "key:" << key << " pos:" << macth.offset << endl;
+        cout << "id:" << macth.pattern_id << " key:" << key << " pos:" << macth.offset << endl;
     }
     cout << "------------------------------------" << endl;
     auto one = ac.match_one(s4.c_str(), s4.length());
     one.keyword.push_back('\0');
     string key = (char*)one.keyword.data();
-    cout << "key:" << key << " pos:" << one.offset << endl;
+    cout << "id:" << one.pattern_id << " key:" << key << " pos:" << one.offset << endl;
 
     // 通配模式匹配："??" 表示任意一个字节
     cout << "------------------------------------" << endl;
