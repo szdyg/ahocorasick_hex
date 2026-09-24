@@ -55,6 +55,11 @@ public:
     ahocorasick_hex();
     ~ahocorasick_hex();
 
+    // 禁止拷贝：_trie_root 是 shared_ptr，默认拷贝只会复制指针，两个对象共用同一棵 trie，
+    // 一方 add_keyword() 会影响另一方，各自 finalize() 一次也等于对同一棵树重复 finalize()。
+    ahocorasick_hex(const ahocorasick_hex&) = delete;
+    ahocorasick_hex& operator=(const ahocorasick_hex&) = delete;
+
     /// <summary>
     /// 添加关键字，必须在 finalize() 之前调用；finalize() 之后再调用行为未定义。
     /// </summary>
