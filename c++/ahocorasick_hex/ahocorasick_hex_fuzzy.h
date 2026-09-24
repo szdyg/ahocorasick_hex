@@ -33,6 +33,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "ahocorasick_hex.h"
 
@@ -64,10 +65,18 @@ public:
     /// 添加通配模式，必须在 finalize() 之前调用。
     /// </summary>
     /// <param name="hex_pattern">模式串，如 "AECC3256????CEFF1256"</param>
-    /// <param name="pattern_id">由调用者指定的模式编号，命中时原样回填到 fuzzy_match::pattern_id。
-    /// 本类不校验唯一性，多个模式可以共用同一个编号</param>
-    /// <returns>成功返回 true；模式串为空、非法、含半字节通配、全为通配符或已 finalize() 时返回 false</returns>
+    /// <param name="pattern_id">模式编号，由调用者指定，命中时原样回填到 fuzzy_match::pattern_id；不可与已添加的模式重复</param>
+    /// <returns>成功返回 true；模式串非法、含半字节通配、全为通配符、pattern_id 重复或已 finalize() 时返回 false</returns>
     bool add_pattern(const std::string& hex_pattern, size_t pattern_id);
+
+    /// <summary>
+    /// 添加通配模式，必须在 finalize() 之前调用。
+    /// </summary>
+    /// <param name="hex_pattern">模式串</param>
+    /// <param name="hex_len">模式串长度</param>
+    /// <param name="pattern_id">模式编号，由调用者指定；不可与已添加的模式重复</param>
+    /// <returns>成功返回 true；模式串非法、含半字节通配、全为通配符、pattern_id 重复或已 finalize() 时返回 false</returns>
+    bool add_pattern(const char* hex_pattern, size_t hex_len, size_t pattern_id);
 
     /// <summary>
     /// 构建内部自动机。必须在所有 add_pattern() 之后、任何 match_*() 之前调用。
@@ -103,7 +112,7 @@ public:
 private:
     class pattern {
     public:
-        size_t pattern_id = 0;       // 调用者指定的编号
+        size_t id = 0;               // 调用者指定的模式编号
         std::vector<uint8_t> value;  // 通配位置为 0x00
         std::vector<uint8_t> mask;   // 字面量位置为 0xFF，通配位置为 0x00
         size_t anchor_offset = 0;    // 锚点片段在模式中的偏移
@@ -112,7 +121,7 @@ private:
 
     class anchor_ref {
     public:
-        size_t pattern_index = 0;  // _patterns 的下标，不是调用者指定的 pattern_id
+        size_t pattern_index = 0;    // _patterns 下标，与调用者指定的编号无关
         size_t anchor_offset = 0;
     };
 
@@ -138,6 +147,7 @@ private:
     ahocorasick_hex _ac;                 // 只装字面量锚点，不含任何通配信息
     std::vector<pattern> _patterns;      // 锚点字节串 -> 引用它的模式列表。多个模式可以共用同一锚点。
     std::unordered_map<std::string, std::vector<anchor_ref>> _anchors;
+    std::unordered_set<size_t> _ids;     // 已占用的模式编号，用于拒绝重复
     bool _finalized = false;
 };
 

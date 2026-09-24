@@ -47,7 +47,7 @@ int main()
     // 通配模式匹配："??" 表示任意一个字节
     cout << "------------------------------------" << endl;
     ahocorasick_hex_fuzzy fuzzy;
-    fuzzy.add_pattern("AECC3256????CEFF1256", 1001);  // 编号由调用者指定
+    fuzzy.add_pattern("AECC3256????CEFF1256", 1001);
     fuzzy.finalize();
 
     vector<uint8_t> buf = {
