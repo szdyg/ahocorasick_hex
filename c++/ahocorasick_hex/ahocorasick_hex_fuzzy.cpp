@@ -28,7 +28,6 @@
 #include "ahocorasick_hex_fuzzy.h"
 
 #include <algorithm>
-#include <cstring>
 
 
 ahocorasick_hex_fuzzy::ahocorasick_hex_fuzzy() {
@@ -104,16 +103,17 @@ bool ahocorasick_hex_fuzzy::parse(const char* hex, size_t hex_len,
 }
 
 
-bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t* pattern_id) {
-    if (hex_pattern == nullptr) {
-        return false;
-    }
-    return add_pattern(hex_pattern, strlen(hex_pattern), pattern_id);
+bool ahocorasick_hex_fuzzy::add_pattern(const std::string& hex_pattern, size_t pattern_id) {
+    return add_pattern(hex_pattern.data(), hex_pattern.size(), pattern_id);
 }
 
-bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len, size_t* pattern_id) {
+bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len, size_t pattern_id) {
     if (hex_pattern == nullptr || hex_len == 0 || _finalized) {
         return false;
+    }
+
+    if (_ids.count(pattern_id)) {
+        return false;  // 编号重复
     }
 
     pattern pat;
@@ -150,8 +150,9 @@ bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len,
 
     pat.anchor_offset = best_offset;
     pat.anchor_len = best_len;
+    pat.id = pattern_id;
 
-    size_t id = _patterns.size();
+    size_t index = _patterns.size();
     std::string key((const char*)&pat.value[best_offset], best_len);
 
     auto it = _anchors.find(key);
@@ -161,17 +162,14 @@ bool ahocorasick_hex_fuzzy::add_pattern(const char* hex_pattern, size_t hex_len,
         if (!_ac.add_keyword(&pat.value[best_offset], best_len)) {
             return false;
         }
-        _anchors[key].push_back({ id, best_offset });
+        _anchors[key].push_back({ index, best_offset });
     }
     else {
-        it->second.push_back({ id, best_offset });
+        it->second.push_back({ index, best_offset });
     }
 
     _patterns.push_back(std::move(pat));
-
-    if (pattern_id != nullptr) {
-        *pattern_id = id;
-    }
+    _ids.insert(pattern_id);
     return true;
 }
 
@@ -222,13 +220,13 @@ std::vector<fuzzy_match> ahocorasick_hex_fuzzy::match_all(uint8_t* data, size_t 
             }
 
             size_t start = hit.offset - ref.anchor_offset;
-            const pattern& pat = _patterns[ref.pattern_id];
+            const pattern& pat = _patterns[ref.pattern_index];
             if (!verify(pat, data, len, start)) {
                 continue;
             }
 
             fuzzy_match match;
-            match.pattern_id = ref.pattern_id;
+            match.pattern_id = pat.id;
             match.offset = start;
             match.data.assign(data + start, data + start + pat.value.size());
             results.push_back(std::move(match));
